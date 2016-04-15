@@ -1,0 +1,31 @@
+@import "materialize.scss";
+
+body {
+	
+}
+
+.fullwidth {
+  width: 100%;
+  margin-top: 20px;
+}
+
+.gameID {
+  text-align: center;
+  font-size: 72px;
+}
+
+.current-turn-shadow {
+  -webkit-box-shadow: 0 0 10px 2px rgba(255,204,0,1);
+  -moz-box-shadow: 0 0 10px 2px rgba(255,204,0,1);
+  box-shadow: 0 0 10px 2px rgba(255,204,0,1);
+}
+
+.activeturn {
+  display: none;
+}
+
+.playGameWrapper.current-turn {
+  .activeturn {
+    display: block;
+  }
+}

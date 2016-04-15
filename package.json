@@ -1,0 +1,29 @@
+{
+  "name": "kingoftokyo",
+  "description": "King of Tokyo",
+  "version": "0.1.0",
+  "dependencies": {
+    "express": "3.x",
+    "socket.io": "0.9"
+  },
+  "main": "index.js",
+  "devDependencies": {
+    "browser-sync": "^2.12.2",
+    "gulp": "^3.9.1",
+    "gulp-sass": "^2.2.0"
+  },
+  "scripts": {
+    "test": "node index.js",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": ""
+  },
+  "homepage": "http://mikehermans.nl"
+}
