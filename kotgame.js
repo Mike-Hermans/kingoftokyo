@@ -15,12 +15,12 @@ exports.initGame = function(sio, socket){
     // Host Events
     gameSocket.on('hostCreateNewGame', hostCreateNewGame);
     gameSocket.on('hostRoomFull', hostPrepareGame);
-    gameSocket.on('hostCountdownFinished', hostStartGame);
-    gameSocket.on('hostNextRound', hostNextRound);
+    gameSocket.on('hostPreparedTurn', hostPreparedTurn);
 
     // Player Events
     gameSocket.on('playerJoinGame', playerJoinGame);
     gameSocket.on('playerAttacked', playerAttacked);
+    gameSocket.on('playerEndTurn', playerEndTurn);
 };
 
 /* *******************************
@@ -34,51 +34,38 @@ exports.initGame = function(sio, socket){
  */
 function hostCreateNewGame() {
     // Create a unique Socket.IO Room
-    var thisGameId = ( Math.random() * 100000 ) | 0;
+    var thisgameID = ( Math.random() * 100000 ) | 0;
 
-    // Return the Room ID (gameId) and the socket ID (socketId) to the browser client
-    this.emit('newGameCreated', {gameId: thisGameId, socketId: this.id});
+    // Return the Room ID (gameID) and the socket ID (socketId) to the browser client
+    this.emit('newGameCreated', {gameID: thisgameID, socketId: this.id});
 
     // Join the Room and wait for the players
-    this.join(thisGameId.toString());
-}
-
-/*
- * Two players have joined. Alert the host!
- * @param gameId The game ID / room ID
- */
-function hostPrepareGame(gameId) {
-    var sock = this;
-    var data = {
-        socketId : sock.id,
-        gameId : gameId
-    };
-    //console.log("All Players Present. Preparing game...");
-    io.sockets.in(data.gameId).emit('beginNewGame', data);
-}
-
-/*
- * The Countdown has finished, and the game begins!
- * @param gameId The game ID / room ID
- */
-function hostStartGame(gameId) {
-    console.log('Game Started.');
-    sendWord(0,gameId);
+    this.join(thisgameID.toString());
 }
 
 /**
- * A player answered correctly. Time for the next word.
- * @param data Sent from the client. Contains the current round and gameId (room)
+ * Two players have joined. Alert the host!
+ * @param gameID The game ID / room ID
  */
-function hostNextRound(data) {
-    if(data.round < wordPool.length ){
-        // Send a new set of words back to the host and players.
-        sendWord(data.round, data.gameId);
-    } else {
-        // If the current round exceeds the number of words, send the 'gameOver' event.
-        io.sockets.in(data.gameId).emit('gameOver',data);
-    }
+function hostPrepareGame(gameID) {
+    var sock = this;
+    var data = {
+        socketId : sock.id,
+        gameID : gameID
+    };
+    io.sockets.in(data.gameID).emit('beginNewGame', data);
 }
+
+function hostPreparedTurn(data) {
+    var sock = this;
+    var newdata = {
+        socketId : sock.id,
+        gameID : data.gameID,
+        currentTurnID: data.currentTurnID
+    };
+    io.sockets.in(newdata.gameID).emit('playerStartTurn', newdata);
+}
+
 /* *****************************
    *                           *
    *     PLAYER FUNCTIONS      *
@@ -88,15 +75,15 @@ function hostNextRound(data) {
 /**
  * A player clicked the 'START GAME' button.
  * Attempt to connect them to the room that matches
- * the gameId entered by the player.
- * @param data Contains data entered via player's input - playerName and gameId.
+ * the gameID entered by the player.
+ * @param data Contains data entered via player's input - playerName and gameID.
  */
 function playerJoinGame(data) {
     // A reference to the player's Socket.IO socket object
     var sock = this;
 
     // Look up the room ID in the Socket.IO manager object.
-    var room = gameSocket.manager.rooms["/" + data.gameId];
+    var room = gameSocket.manager.rooms["/" + data.gameID];
 
     // If the room exists...
     if( room != undefined ){
@@ -104,10 +91,10 @@ function playerJoinGame(data) {
         data.socketId = sock.id;
 
         // Join the room
-        sock.join(data.gameId);
+        sock.join(data.gameID);
 
         // Emit an event notifying the clients that the player has joined the room.
-        io.sockets.in(data.gameId).emit('playerJoinedRoom', data);
+        io.sockets.in(data.gameID).emit('playerJoinedRoom', data);
 
     } else {
         // Otherwise, send an error message back to the player.
@@ -122,5 +109,9 @@ function playerJoinGame(data) {
    ************************* */
 
 function playerAttacked(data) {
-    io.sockets.in(data.gameId).emit('hostCheckAttack', data);
+    io.sockets.in(data.gameID).emit('hostCheckAttack', data);
+}
+
+function playerEndTurn(data) {
+    io.sockets.in(data.gameID).emit('hostHandleEndTurn', data);
 }

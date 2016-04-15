@@ -28,7 +28,7 @@
             <h1>King of Tokyo</h1>
 
             <div class="col s12">
-                <button id="btnCreateGame" class="btn fullwidth left hide-on-med-and-down">CREATE</button>
+                <button id="btnCreateGame" class="btn fullwidth left hide-on-small-only">CREATE</button>
                 <button id="btnJoinGame" class="btn fullwidth right">JOIN</button>
                 <div style="clear:both"></div>
             </div>
@@ -41,7 +41,7 @@
             <h1>Waiting for players</h1>
             <div class="col s12 l6 offset-l3">
                 <div class="card-panel">
-                    <div id="spanNewGameCode" class="gameId">Error!</div>
+                    <div id="spanNewGameCode" class="gameID">Error!</div>
                 </div>
             </div>
 
@@ -59,8 +59,8 @@
             </div>
 
             <div class="info">
-                <label for="inputGameId">Game ID:</label>
-                <input id="inputGameId" type="number"/>
+                <label for="inputgameID">Game ID:</label>
+                <input id="inputgameID" type="number"/>
             </div>
 
             <div class="info buttons">
@@ -74,9 +74,9 @@
         <div class="hidden" id="playerID"></div>
         <div class="hidden" id="gameID"></div>
         <div class="hidden" id="playerName"></div>
-        <div class="playGameWrapper">
-            <button class="btn actionbtn fullwidth" id="actionAttack">ATTACK</button>
-            <button class="btn actionbtn fullwidth" id="actionEndTurn">END TURN</button>
+        <div class="playGameWrapper current-turn">
+            <button class="btn actionbtn fullwidth activeturn" id="actionAttack">ATTACK</button>
+            <button class="btn actionbtn fullwidth activeturn" id="actionEndTurn">END TURN</button>
         </div>
     </script>
 

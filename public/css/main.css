@@ -6210,6 +6210,17 @@ button.picker__today:focus, button.picker__clear:focus, button.picker__close:foc
   width: 100%;
   margin-top: 20px; }
 
-.gameId {
+.gameID {
   text-align: center;
   font-size: 72px; }
+
+.current-turn-shadow {
+  -webkit-box-shadow: 0 0 10px 2px #ffcc00;
+  -moz-box-shadow: 0 0 10px 2px #ffcc00;
+  box-shadow: 0 0 10px 2px #ffcc00; }
+
+.activeturn {
+  display: none; }
+
+.playGameWrapper.current-turn .activeturn {
+  display: block; }

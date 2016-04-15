@@ -29,8 +29,10 @@ jQuery(function($){
             IO.socket.on('beginNewGame', IO.beginNewGame );
             IO.socket.on('error', IO.error );
 
-            // Player action based
             IO.socket.on('hostCheckAttack', IO.hostCheckAttack);
+            IO.socket.on('hostHandleEndTurn', IO.hostCheckEndTurn);
+
+            IO.socket.on('playerStartTurn', IO.playerCheckStartTurn);
         },
 
         /**
@@ -43,7 +45,7 @@ jQuery(function($){
 
         /**
          * A new game has been created and a random game ID has been generated.
-         * @param data {{ gameId: int, socketId: * }}
+         * @param data {{ gameID: int, socketId: * }}
          */
         onNewGameCreated : function(data) {
             App.Host.gameInit(data);
@@ -51,7 +53,7 @@ jQuery(function($){
 
         /**
          * A player has successfully joined the game.
-         * @param data {{playerName: string, gameId: int, socketId: int}}
+         * @param data {{playerName: string, gameID: int, socketId: int}}
          */
         playerJoinedRoom : function(data) {
             // When a player joins a room, do the updateWaitingScreen funciton.
@@ -71,30 +73,41 @@ jQuery(function($){
             App[App.myRole].gameSetup(data);
         },
 
+        hostCheckAttack: function(data) {
+            if (App.myRole == "Host") {
+                App.Host.playerAttacked(data);
+            }
+        },
+
+        hostCheckEndTurn: function(data) {
+            if (App.myRole == "Host") {
+                App.Host.playerEndedTurn(data);
+            }
+        },
+
+        playerCheckStartTurn: function(data) {
+            if (App.myRole == "Player") {
+                App.Player.startTurn(data);
+            }
+        },
+
         /**
          * An error has occurred.
          * @param data
          */
         error : function(data) {
             alert(data.message);
-        },
-
-        hostCheckAttack : function(data) {
-            if(App.myRole === 'Host') {
-                App.Host.playerAttacked(data);
-            }
         }
-
     };
 
     var App = {
 
         /**
-         * Keep track of the gameId, which is identical to the ID
+         * Keep track of the gameID, which is identical to the ID
          * of the Socket.IO Room used for the players and host to communicate
          *
          */
-        gameId: 0,
+        gameID: 0,
 
         /**
          * This is used to differentiate between 'Host' and 'Player' browsers.
@@ -181,21 +194,9 @@ jQuery(function($){
             players : [],
 
             /**
-             * Flag to indicate if a new game is starting.
-             * This is used after the first game ends, and players initiate a new game
-             * without refreshing the browser windows.
-             */
-            isNewGame : false,
-
-            /**
              * Keep track of the number of players that have joined the game.
              */
             numPlayersInRoom: 0,
-
-            /**
-             * A reference to the correct answer for the current round.
-             */
-            currentCorrectAnswer: '',
 
             /**
              * Handler for the "Start" button on the Title Screen.
@@ -206,10 +207,10 @@ jQuery(function($){
 
             /**
              * The Host screen is displayed for the first time.
-             * @param data{{ gameId: int, socketId: * }}
+             * @param data{{ gameID: int, socketId: * }}
              */
             gameInit: function (data) {
-                App.gameId = data.gameId;
+                App.gameID = data.gameID;
                 App.socketId = data.socketId;
                 App.myRole = 'Host';
                 App.Host.numPlayersInRoom = 0;
@@ -227,8 +228,8 @@ jQuery(function($){
                 // Display the URL on screen
                 $('#gameURL').text(window.location.href);
 
-                // Show the gameId / room id on screen
-                $('#spanNewGameCode').text(App.gameId);
+                // Show the gameID / room id on screen
+                $('#spanNewGameCode').text(App.gameID);
             },
 
             /**
@@ -236,14 +237,10 @@ jQuery(function($){
              * @param data{{playerName: string}}
              */
             updateWaitingScreen: function(data) {
-                // If this is a restarted game, show the screen.
-                if ( App.Host.isNewGame ) {
-                    App.Host.displayNewGameScreen();
-                }
                 // Update host screen
                 $('#playersWaiting')
                     .append('<p/>')
-                    .text('Player ' + data.playerName + ' joined the game.');
+                    .text(data.playerName + ' joined the game.');
 
                 // Store the new player's data on the Host.
                 App.Host.players.push(data);
@@ -253,10 +250,8 @@ jQuery(function($){
 
                 // If two players have joined, start the game!
                 if (App.Host.numPlayersInRoom === 2) {
-                    // console.log('Room is full. Almost ready!');
-
                     // Let the server know that two players are present.
-                    IO.socket.emit('hostRoomFull',App.gameId);
+                    IO.socket.emit('hostRoomFull',App.gameID);
                 }
             },
 
@@ -268,6 +263,13 @@ jQuery(function($){
                 App.$gameArea.html(App.$hostGame);
 
                 App.Host.updateGamefield(false);
+
+                var data = {
+                    gameID: App.gameID,
+                    currentTurnID: App.Host.players[App.currentPlayer].socketId
+                };
+
+                IO.socket.emit("hostPreparedTurn", data);
             },
 
             updateGamefield: function(updateMessage) {
@@ -281,12 +283,16 @@ jQuery(function($){
                 ];
 
                 $.each(App.Host.players, function (playerIndex, player) {
-                    console.log(playerIndex);
                     $.each(data, function(dataIndex, data) {
                         $('#player_' + playerIndex)
                             .find(data[0])
                             .html(App.Host.players[playerIndex][data[1]]);
                     });
+
+                    if (playerIndex == App.currentPlayer) {
+                        $(".current-turn-shadow").removeClass("current-turn-shadow");
+                        $("#player_" + playerIndex).addClass("current-turn-shadow");
+                    }
                 });
 
                 if (updateMessage) {
@@ -308,8 +314,20 @@ jQuery(function($){
                 App.Host.updateGamefield(updateMessage);
             },
 
-            endTurn: function(data) {
+            playerEndedTurn: function(data) {
+                if (App.currentPlayer == App.Host.players.length - 1) {
+                    App.currentPlayer = 0;
+                } else {
+                    App.currentPlayer++;
+                }
+                App.Host.updateGamefield(data.playerName + " ended the turn");
 
+                var newdata = {
+                    gameID: App.gameID,
+                    currentTurnID: App.Host.players[App.currentPlayer].socketId
+                };
+
+                IO.socket.emit("hostPreparedTurn", newdata);
             }
         },
 
@@ -339,18 +357,18 @@ jQuery(function($){
             },
 
             /**
-             * The player entered their name and gameId (hopefully)
+             * The player entered their name and gameID (hopefully)
              * and clicked Start.
              */
             onPlayerStartClick: function() {
                 // collect data to send to the server
                 var data = {
-                    gameId : +($('#inputGameId').val()),
+                    gameID : +($('#inputgameID').val()),
                     playerName : $('#inputPlayerName').val() || 'anon',
                     hp: 20
                 };
 
-                // Send the gameId and playerName to the server
+                // Send the gameID and playerName to the server
                 IO.socket.emit('playerJoinGame', data);
 
                 // Set the appropriate properties for the current player.
@@ -365,11 +383,11 @@ jQuery(function($){
                     playerName: $("#playerName").html()
                 };
                 
-                IO.socket.emit('playerAttacked', data);
+                IO.socket.emit('playerAttacked', App.Player.getPlayerData());
             },
 
             onEndturnClick: function() {
-
+                IO.socket.emit('playerEndTurn', App.Player.getPlayerData());
             },
 
             /**
@@ -379,11 +397,11 @@ jQuery(function($){
             updateWaitingScreen : function(data) {
                 if(IO.socket.socket.sessionid === data.socketId){
                     App.myRole = 'Player';
-                    App.gameId = data.gameId;
+                    App.gameID = data.gameID;
 
                     $('#playerWaitingMessage')
                         .append('<p/>')
-                        .text('Joined Game ' + data.gameId + '. Please wait for game to begin.');
+                        .text('Joined Game ' + data.gameID + '. Please wait for game to begin.');
                 }
             },
 
@@ -398,8 +416,26 @@ jQuery(function($){
 
                 // Set some important variables in hidden fields
                 $('#playerID').html(App.socketId);
-                $('#gameID').html(hostData.gameId);
+                $('#gameID').html(hostData.gameID);
                 $('#playerName').html(App.Player.myName);
+            },
+
+            startTurn: function(data) {
+                // Check if current turn is players turn
+                var playerData = App.Player.getPlayerData();
+                if (data.currentTurnID == playerData.playerID) {
+                    $(".playGameWrapper").addClass("current-turn");
+                } else {
+                    $(".playGameWrapper").removeClass("current-turn");
+                }
+            },
+
+            getPlayerData: function() {
+                return {
+                    gameID : $('#gameID').html(),
+                    playerID : $('#playerID').html(),
+                    playerName: $("#playerName").html()
+                };
             }
         }
     };
