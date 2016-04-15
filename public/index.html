@@ -28,8 +28,8 @@
             <h1>King of Tokyo</h1>
 
             <div class="col s12">
-                <button id="btnCreateGame" class="btn left hide-on-med-and-down">CREATE</button>
-                <button id="btnJoinGame" class="btn right">JOIN</button>
+                <button id="btnCreateGame" class="btn fullwidth left hide-on-med-and-down">CREATE</button>
+                <button id="btnJoinGame" class="btn fullwidth right">JOIN</button>
                 <div style="clear:both"></div>
             </div>
         </div>
@@ -38,12 +38,12 @@
     <!-- This screen appears when a user clicks "CREATE" on the Title Screen -->
     <script id="create-game-template" type="text/template">
         <div class="createGameWrapper">
-            <h2>Open this site on your mobile device:</h2>
-            <div class="info">Open this site on your mobile device:</div>
-            <div id="gameURL" class="infoBig">Error!</div>
-
-            <div class="info">Then click <strong>JOIN</strong> and <br/> enter the following Game ID:</div>
-            <div id="spanNewGameCode" class="gameId">Error!</div>
+            <h1>Waiting for players</h1>
+            <div class="col s12 l6 offset-l3">
+                <div class="card-panel">
+                    <div id="spanNewGameCode" class="gameId">Error!</div>
+                </div>
+            </div>
 
             <div id="playersWaiting"></div>
         </div>
@@ -64,15 +64,19 @@
             </div>
 
             <div class="info buttons">
-                <button id="btnStart" class="btn">Start</button>
+                <button id="btnStart" class="btn fullwidth">Start</button>
                 <div id="playerWaitingMessage"></div>
             </div>
         </div>
     </script>
 
     <script id="main-game-template" type="text/template">
+        <div class="hidden" id="playerID"></div>
+        <div class="hidden" id="gameID"></div>
+        <div class="hidden" id="playerName"></div>
         <div class="playGameWrapper">
-            <h2>hoi</h2>
+            <button class="btn actionbtn fullwidth" id="actionAttack">ATTACK</button>
+            <button class="btn actionbtn fullwidth" id="actionEndTurn">END TURN</button>
         </div>
     </script>
 
@@ -80,20 +84,27 @@
     <script id="host-game-template" type="text/template">
         <div class="row">
             <div class="col s12 m6">
-                <div id="player1Score" class="card">
+                <div id="player_0" class="card">
                     <div class="card-content">
                         <span class="card-title playerName">Player 1</span>
-                        <p>HP: 20</p>
+                        <p>HP: <span class="playerHP">0</span></p>
                     </div>
                 </div>
             </div>
             <div class="col s12 m6">
-                <div id="player2Score" class="card">
+                <div id="player_1" class="card">
                     <div class="card-content">
                         <span class="card-title playerName">Player 2</span>
-                        <p>HP: 20</p>
+                        <p>HP: <span class="playerHP">0</span></p>
                     </div>
                 </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col s12">
+                <ul class="collection" id="hostStatusCollection">
+                    <li class="collection-item">Game started</li>
+                </ul>
             </div>
         </div>
     </script>

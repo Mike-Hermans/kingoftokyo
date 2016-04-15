@@ -28,6 +28,9 @@ jQuery(function($){
             IO.socket.on('playerJoinedRoom', IO.playerJoinedRoom );
             IO.socket.on('beginNewGame', IO.beginNewGame );
             IO.socket.on('error', IO.error );
+
+            // Player action based
+            IO.socket.on('hostCheckAttack', IO.hostCheckAttack);
         },
 
         /**
@@ -35,13 +38,12 @@ jQuery(function($){
          */
         onConnected : function() {
             // Cache a copy of the client's socket.IO session ID on the App
-            App.mySocketId = IO.socket.socket.sessionid;
-            // console.log(data.message);
+            App.socketId = IO.socket.socket.sessionid;
         },
 
         /**
          * A new game has been created and a random game ID has been generated.
-         * @param data {{ gameId: int, mySocketId: * }}
+         * @param data {{ gameId: int, socketId: * }}
          */
         onNewGameCreated : function(data) {
             App.Host.gameInit(data);
@@ -49,7 +51,7 @@ jQuery(function($){
 
         /**
          * A player has successfully joined the game.
-         * @param data {{playerName: string, gameId: int, mySocketId: int}}
+         * @param data {{playerName: string, gameId: int, socketId: int}}
          */
         playerJoinedRoom : function(data) {
             // When a player joins a room, do the updateWaitingScreen funciton.
@@ -75,6 +77,12 @@ jQuery(function($){
          */
         error : function(data) {
             alert(data.message);
+        },
+
+        hostCheckAttack : function(data) {
+            if(App.myRole === 'Host') {
+                App.Host.playerAttacked(data);
+            }
         }
 
     };
@@ -98,13 +106,13 @@ jQuery(function($){
          * each player and host. It is generated when the browser initially
          * connects to the server when the page loads for the first time.
          */
-        mySocketId: '',
+        socketId: '',
 
         /**
          * Identifies the current round. Starts at 0 because it corresponds
          * to the array of word data stored on the server.
          */
-        currentRound: 0,
+        currentPlayer: 0,
 
         /* *************************************
          *                Setup                *
@@ -144,8 +152,9 @@ jQuery(function($){
             // Player
             App.$doc.on('click', '#btnJoinGame', App.Player.onJoinClick);
             App.$doc.on('click', '#btnStart',App.Player.onPlayerStartClick);
-            App.$doc.on('click', '.btnAnswer',App.Player.onPlayerAnswerClick);
-            App.$doc.on('click', '#btnPlayerRestart', App.Player.onPlayerRestart);
+
+            App.$doc.on('click', '#actionAttack', App.Player.onAttackClick);
+            App.$doc.on('click', '#actionEndTurn', App.Player.onEndturnClick);
         },
 
         /* *************************************
@@ -197,11 +206,11 @@ jQuery(function($){
 
             /**
              * The Host screen is displayed for the first time.
-             * @param data{{ gameId: int, mySocketId: * }}
+             * @param data{{ gameId: int, socketId: * }}
              */
             gameInit: function (data) {
                 App.gameId = data.gameId;
-                App.mySocketId = data.mySocketId;
+                App.socketId = data.socketId;
                 App.myRole = 'Host';
                 App.Host.numPlayersInRoom = 0;
 
@@ -255,18 +264,52 @@ jQuery(function($){
              * Show the countdown screen
              */
             gameSetup : function() {
-
                 // Prepare the game screen with new HTML
                 App.$gameArea.html(App.$hostGame);
 
-                // Display the players' names on screen
-                $('#player1Score')
-                    .find('.playerName')
-                    .html(App.Host.players[0].playerName);
+                App.Host.updateGamefield(false);
+            },
 
-                $('#player2Score')
-                    .find('.playerName')
-                    .html(App.Host.players[1].playerName);
+            updateGamefield: function(updateMessage) {
+                // Display the players' names on screen
+
+                // First data value: DOM-selector
+                // second value: App.Host.players[id].{property}
+                var data = [
+                    ['.playerName', 'playerName'],
+                    ['.playerHP', 'hp']
+                ];
+
+                $.each(App.Host.players, function (playerIndex, player) {
+                    console.log(playerIndex);
+                    $.each(data, function(dataIndex, data) {
+                        $('#player_' + playerIndex)
+                            .find(data[0])
+                            .html(App.Host.players[playerIndex][data[1]]);
+                    });
+                });
+
+                if (updateMessage) {
+                    $("#hostStatusCollection").prepend('<li class="collection-item">'+updateMessage+'</li>');
+                }
+            },
+
+            playerAttacked: function(data) {
+                var attackingPlayer = data.playerID;
+
+                $.each(App.Host.players, function( index, player ) {
+                    if (player.socketId != attackingPlayer) {
+                        player.hp -= 1;
+                    }
+                });
+
+                var updateMessage = data.playerName + " attacked!";
+
+                App.Host.updateGamefield(updateMessage);
+            },
+
+            endTurn: function(data) {
+
             }
         },
 
@@ -291,8 +334,6 @@ jQuery(function($){
              * Click handler for the 'JOIN' button
              */
             onJoinClick: function () {
-                // console.log('Clicked "Join A Game"');
-
                 // Display the Join Game HTML on the player's screen.
                 App.$gameArea.html(App.$templateJoinGame);
             },
@@ -302,12 +343,11 @@ jQuery(function($){
              * and clicked Start.
              */
             onPlayerStartClick: function() {
-                // console.log('Player clicked "Start"');
-
                 // collect data to send to the server
                 var data = {
                     gameId : +($('#inputGameId').val()),
-                    playerName : $('#inputPlayerName').val() || 'anon'
+                    playerName : $('#inputPlayerName').val() || 'anon',
+                    hp: 20
                 };
 
                 // Send the gameId and playerName to the server
@@ -318,12 +358,26 @@ jQuery(function($){
                 App.Player.myName = data.playerName;
             },
 
+            onAttackClick: function() {
+                var data = {
+                    gameID : $('#gameID').html(),
+                    playerID : $('#playerID').html(),
+                    playerName: $("#playerName").html()
+                };
+                
+                IO.socket.emit('playerAttacked', data);
+            },
+
+            onEndturnClick: function() {
+
+            },
+
             /**
              * Display the waiting screen for player 1
              * @param data
              */
             updateWaitingScreen : function(data) {
-                if(IO.socket.socket.sessionid === data.mySocketId){
+                if(IO.socket.socket.sessionid === data.socketId){
                     App.myRole = 'Player';
                     App.gameId = data.gameId;
 
@@ -338,9 +392,14 @@ jQuery(function($){
              * @param hostData
              */
             gameSetup : function(hostData) {
-                App.Player.hostSocketId = hostData.mySocketId;
+                App.Player.hostSocketId = hostData.socketId;
 
                 App.$gameArea.html(App.$templateMainGame);
+
+                // Set some important variables in hidden fields
+                $('#playerID').html(App.socketId);
+                $('#gameID').html(hostData.gameId);
+                $('#playerName').html(App.Player.myName);
             }
         }
     };

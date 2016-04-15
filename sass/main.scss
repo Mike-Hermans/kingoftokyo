@@ -4,14 +4,12 @@ body {
 	
 }
 
-.index {
-  #btnCreateGame,
-  #btnJoinGame {
-    width: 100%;
-    margin-bottom: 20px;
-  }
+.fullwidth {
+  width: 100%;
+  margin-top: 20px;
 }
 
-.createGameWrapper {
-
+.gameId {
+  text-align: center;
+  font-size: 72px;
 }
