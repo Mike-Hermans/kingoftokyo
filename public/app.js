@@ -31,6 +31,7 @@ jQuery(function($){
 
             IO.socket.on('hostCheckAttack', IO.hostCheckAttack);
             IO.socket.on('hostHandleEndTurn', IO.hostCheckEndTurn);
+            IO.socket.on('playerRolledDice', IO.hostCheckDiceRoll);
 
             IO.socket.on('playerStartTurn', IO.playerCheckStartTurn);
         },
@@ -42,6 +43,9 @@ jQuery(function($){
             // Cache a copy of the client's socket.IO session ID on the App
             App.socketId = IO.socket.socket.sessionid;
         },
+
+        // gameData object
+        gameData: {},
 
         /**
          * A new game has been created and a random game ID has been generated.
@@ -82,6 +86,12 @@ jQuery(function($){
         hostCheckEndTurn: function(data) {
             if (App.myRole == "Host") {
                 App.Host.playerEndedTurn(data);
+            }
+        },
+
+        hostCheckDiceRoll: function(data) {
+            if (App.myRole == "Host") {
+                App.Host.playerRolledDice(data);
             }
         },
 
@@ -138,6 +148,7 @@ jQuery(function($){
             App.cacheElements();
             App.showInitScreen();
             App.bindEvents();
+            App.loadGameData();
         },
 
         /**
@@ -168,6 +179,13 @@ jQuery(function($){
 
             App.$doc.on('click', '#actionAttack', App.Player.onAttackClick);
             App.$doc.on('click', '#actionEndTurn', App.Player.onEndturnClick);
+            App.$doc.on('click', '#actionConfirmDiceRoll', App.Player.onConfirmDiceClick());
+        },
+
+        loadGameData: function() {
+            $.getJSON('data/gamedata.json', function(data) {
+                App.gameData = data;
+            });
         },
 
         /* *************************************
@@ -256,7 +274,7 @@ jQuery(function($){
             },
 
             /**
-             * Show the countdown screen
+             * Prepare the game field
              */
             gameSetup : function() {
                 // Prepare the game screen with new HTML
@@ -273,13 +291,15 @@ jQuery(function($){
             },
 
             updateGamefield: function(updateMessage) {
-                // Display the players' names on screen
+                // Display the players' names data on screen
 
                 // First data value: DOM-selector
                 // second value: App.Host.players[id].{property}
                 var data = [
                     ['.playerName', 'playerName'],
-                    ['.playerHP', 'hp']
+                    ['.playerHP', 'hp'],
+                    ['.playerVP', 'vp'],
+                    ['.playerEnergy', 'energy']
                 ];
 
                 $.each(App.Host.players, function (playerIndex, player) {
@@ -301,7 +321,18 @@ jQuery(function($){
             },
 
             playerAttacked: function(data) {
+                // TODO: First attacker goes to Tokyo City
                 var attackingPlayer = data.playerID;
+
+                var currentTokyoCityTakeover = $("#tokyo-city").html();
+
+                var currentTokyoTakeover = currentTokyoCityTakeover == data.playerID;
+
+                if (currentTokyoTakeover == "") {
+                    
+                } else {
+                    
+                }
 
                 $.each(App.Host.players, function( index, player ) {
                     if (player.socketId != attackingPlayer) {
@@ -309,9 +340,11 @@ jQuery(function($){
                     }
                 });
 
-                var updateMessage = data.playerName + " attacked!";
+                App.Host.updateGamefield(data.playerName + " attacked!");
+            },
 
-                App.Host.updateGamefield(updateMessage);
+            playerRolledDice: function(data) {
+                    
             },
 
             playerEndedTurn: function(data) {
@@ -364,8 +397,12 @@ jQuery(function($){
                 // collect data to send to the server
                 var data = {
                     gameID : +($('#inputgameID').val()),
-                    playerName : $('#inputPlayerName').val() || 'anon',
-                    hp: 20
+                    playerName : $('#inputPlayerName').val() || 'noob',
+                    hp: 20,
+                    vp: 0,
+                    energy: 0,
+                    maxhp: 20,
+                    isInTokyoCity: false
                 };
 
                 // Send the gameID and playerName to the server
@@ -375,14 +412,26 @@ jQuery(function($){
                 App.myRole = 'Player';
                 App.Player.myName = data.playerName;
             },
+            
+            onConfirmDiceClick: function() {
+                var data = App.Player.getPlayerData();
+
+                // Get dice data
+                data.diceresult = {
+                    1: $("#inputDice1"),
+                    2: $("#inputDice2"),
+                    3: $("#inputDice3"),
+                    Damage: $("#inputDiceDamage"),
+                    Heart: $("#inputDiceHeart"),
+                    Energy: $("#inputDiceEnergy")
+                };
+
+                // TODO: Empty fields
+
+                IO.socket.emit('playerConfirmedDice', data);
+            },
 
             onAttackClick: function() {
-                var data = {
-                    gameID : $('#gameID').html(),
-                    playerID : $('#playerID').html(),
-                    playerName: $("#playerName").html()
-                };
-                
                 IO.socket.emit('playerAttacked', App.Player.getPlayerData());
             },
 

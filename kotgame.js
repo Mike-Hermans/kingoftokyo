@@ -21,6 +21,7 @@ exports.initGame = function(sio, socket){
     gameSocket.on('playerJoinGame', playerJoinGame);
     gameSocket.on('playerAttacked', playerAttacked);
     gameSocket.on('playerEndTurn', playerEndTurn);
+    gameSocket.on('playerConfirmedDice', playerConfirmedDice);
 };
 
 /* *******************************
@@ -114,4 +115,8 @@ function playerAttacked(data) {
 
 function playerEndTurn(data) {
     io.sockets.in(data.gameID).emit('hostHandleEndTurn', data);
+}
+
+function playerConfirmedDice(data) {
+    io.sockets.in(data.gameID).emit('playerRolledDice', data);
 }

@@ -7,6 +7,14 @@
     "The King",
     "Meka Dragon"
   ],
+  "diceoptions": [
+    "1",
+    "2",
+    "3",
+    "heart",
+    "damage",
+    "energy"
+  ],
   "cards": {
     "keep": [
       {
