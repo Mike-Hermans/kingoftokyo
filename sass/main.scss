@@ -20,16 +20,6 @@ body {
   box-shadow: 0 0 10px 2px rgba(255,204,0,1);
 }
 
-.activeturn {
-  display: none;
-}
-
-.playGameWrapper.current-turn {
-  .activeturn {
-    display: block;
-  }
-}
-
 .hidden {
   display: none;
 }

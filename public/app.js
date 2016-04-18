@@ -29,11 +29,13 @@ jQuery(function($){
             IO.socket.on('beginNewGame', IO.beginNewGame );
             IO.socket.on('error', IO.error );
 
-            IO.socket.on('hostCheckAttack', IO.hostCheckAttack);
             IO.socket.on('hostHandleEndTurn', IO.hostCheckEndTurn);
             IO.socket.on('playerRolledDice', IO.hostCheckDiceRoll);
 
             IO.socket.on('playerStartTurn', IO.playerCheckStartTurn);
+            IO.socket.on('playerEndedDefending', IO.playerCheckDefendEnd);
+            IO.socket.on('allPlayersDefended', IO.allPlayersDefended);
+            IO.socket.on('playerTokyoTakeover', IO.checkTokyoTakeover);
         },
 
         /**
@@ -77,12 +79,6 @@ jQuery(function($){
             App[App.myRole].gameSetup(data);
         },
 
-        hostCheckAttack: function(data) {
-            if (App.myRole == "Host") {
-                App.Host.playerAttacked(data);
-            }
-        },
-
         hostCheckEndTurn: function(data) {
             if (App.myRole == "Host") {
                 App.Host.playerEndedTurn(data);
@@ -90,15 +86,27 @@ jQuery(function($){
         },
 
         hostCheckDiceRoll: function(data) {
-            if (App.myRole == "Host") {
-                App.Host.playerRolledDice(data);
-            }
+            App[App.myRole].playerRolledDice(data);
         },
 
         playerCheckStartTurn: function(data) {
             if (App.myRole == "Player") {
                 App.Player.startTurn(data);
             }
+        },
+
+        playerCheckDefendEnd: function(data) {
+            if (App.myRole == "Host") {
+                App.Host.playerDefended(data);
+            }
+        },
+
+        allPlayersDefended: function(data) {
+            App[App.myRole].allPlayersDefended(data);
+        },
+
+        checkTokyoTakeover: function(data) {
+            App.currentlyInTokyo = data.socketId;
         },
 
         /**
@@ -136,6 +144,16 @@ jQuery(function($){
          * to the array of word data stored on the server.
          */
         currentPlayer: 0,
+
+        /**
+         * Count how many players ended their defensive turn
+         */
+        playersDefended: 0,
+
+        /**
+            Keep track of who is in Tokyo
+         */
+        currentlyInTokyo: "",
 
         /* *************************************
          *                Setup                *
@@ -177,9 +195,11 @@ jQuery(function($){
             App.$doc.on('click', '#btnJoinGame', App.Player.onJoinClick);
             App.$doc.on('click', '#btnStart',App.Player.onPlayerStartClick);
 
-            App.$doc.on('click', '#actionAttack', App.Player.onAttackClick);
             App.$doc.on('click', '#actionEndTurn', App.Player.onEndturnClick);
-            App.$doc.on('click', '#actionConfirmDiceRoll', App.Player.onConfirmDiceClick());
+            App.$doc.on('click', '#actionConfirmDiceRoll', App.Player.onConfirmDiceClick);
+            App.$doc.on('click', '#actionEndDefending', App.Player.onEndDefendingClick);
+
+            App.$doc.on('click', '#actionYield', App.Player.onYieldClick);
         },
 
         loadGameData: function() {
@@ -215,6 +235,11 @@ jQuery(function($){
              * Keep track of the number of players that have joined the game.
              */
             numPlayersInRoom: 0,
+
+            /**
+             * data for player that currently attacks
+             */
+            currentTurnData: "",
 
             /**
              * Handler for the "Start" button on the Title Screen.
@@ -320,31 +345,140 @@ jQuery(function($){
                 }
             },
 
-            playerAttacked: function(data) {
-                // TODO: First attacker goes to Tokyo City
-                var attackingPlayer = data.playerID;
+            playerRolledDice: function(data) {
+                // Manage data for the player that rolled
+                var messages = [];
+                var completeMessage = "";
+                var damage = 0;
+                var attackingPlayerIsInTokyo;
 
-                var currentTokyoCityTakeover = $("#tokyo-city").html();
+                $.each(App.Host.players, function( index, player) {
+                    if (player.socketId == data.playerID) {
+                        // If player is in Tokyo City, give 'em points
+                        if (player.isInTokyoCity) {
+                            player.vp += 2;
+                            messages.push("gains 2 victory points from Tokyo City");
+                        }
 
-                var currentTokyoTakeover = currentTokyoCityTakeover == data.playerID;
+                        // Victory points rolls
+                        var victorypoints = 0;
+                        if (data.diceresult.one >= 3) {
+                            victorypoints += 1 + (data.diceresult.one - 3);
+                        }
+                        if (data.diceresult.two >= 3) {
+                            victorypoints += 2 + (data.diceresult.two - 3);
+                        }
+                        if (data.diceresult.three >= 3) {
+                            victorypoints += 3 + (data.diceresult.three - 3);
+                        }
 
-                if (currentTokyoTakeover == "") {
-                    
-                } else {
-                    
-                }
+                        if (victorypoints > 0) {
+                            player.vp += victorypoints;
 
-                $.each(App.Host.players, function( index, player ) {
-                    if (player.socketId != attackingPlayer) {
-                        player.hp -= 1;
+                            var s = "";
+                            var gains = "";
+                            if (victorypoints > 1) {
+                                s = "s";
+                            }
+                            if (!player.isInTokyoCity) {
+                                gains = "gains ";
+                            }
+
+                            messages.push(gains + victorypoints + " victory point" + s + " from a dice roll");
+                        }
+
+                        // Energy
+                        player.energy += parseInt(data.diceresult.energy);
+
+                        if (!player.isInTokyoCity) {
+                            for (var i = 0; i < data.diceresult.heart; i++) {
+                                if (player.hp < player.maxhp) {
+                                    player.hp++;
+                                }
+                            }
+                        }
+
+                        damage = parseInt(data.diceresult.damage);
+                        attackingPlayerIsInTokyo = player.isInTokyoCity;
+
+                        if ($("#tokyo-city").html() == "" && damage > 0) {
+                            player.isInTokyoCity = true;
+                            $("#tokyo-city").html(player.playerName).data("id", player.socketId);
+                            damage = 0;
+                            player.vp++;
+
+                            IO.socket.emit("tokyoTakeOver", player);
+                        }
+
+                        for (var i = 0; i < messages.length; i++) {
+                            if (i == 0) {
+                                completeMessage += player.playerName + " " + messages[i];
+                                if (messages.length == 1) {
+                                    completeMessage += ".";
+                                }
+                            } else {
+                                if (i == messages.length - 1) {
+                                    completeMessage += " and " + messages[i] + ".";
+                                } else {
+                                    completeMessage += ", " + messages[i];
+                                }
+                            }
+                        }
+
+                        if (completeMessage == "") {
+                            completeMessage = player.playerName + " didn't do a lot of things";
+                        }
+
+                        App.Host.currentTurnData = {
+                            playerName: player.playerName,
+                            playerID: player.socketId,
+                            damage: damage,
+                            yield: ""
+                        }
                     }
                 });
 
-                App.Host.updateGamefield(data.playerName + " attacked!");
+                App.Host.updateGamefield(completeMessage);
             },
 
-            playerRolledDice: function(data) {
-                    
+            allPlayersDefended: function(data) {
+                var turndata = App.Host.currentTurnData;
+
+                if (turndata.damage > 0) {
+                    if (turndata.playerID == App.currentlyInTokyo) {
+                        // Deal damage to everyone
+                        $.each(App.Host.players, function(index, player) {
+                            if (player.socketId != turndata.playerID) {
+                                player.hp -= turndata.damage;
+                                App.Host.updateGamefield(player.playerName + " takes " + turndata.damage + " damage");
+                            }
+                        });
+                    } else {
+                        // Someone attacks Tokyo
+                        $.each(App.Host.players, function(index, player) {
+                            if (player.socketId == App.currentlyInTokyo) {
+                                // This player gets attacked
+                                player.hp -= turndata.damage;
+                                App.Host.updateGamefield(player.playerName + " takes " + turndata.damage + " damage");
+                            }
+                        });
+
+                        if (turndata.yield != "") {
+                            $.each(App.Host.players, function(index, player) {
+                                if (player.socketId == turndata.yield) {
+                                    player.isInTokyoCity = false;
+                                    App.Host.updateGamefield(player.playerName + " leaves Tokyo City!");
+                                } else if (player.socketId == turndata.playerID) {
+                                    player.isInTokyoCity = true;
+                                    IO.socket.emit("tokyoTakeOver", player);
+                                    App.Host.updateGamefield(player.playerName + " takes over!");
+                                    player.vp++;
+                                    $("#tokyo-city").html(player.playerName);
+                                }
+                            });
+                        }
+                    }
+                }
             },
 
             playerEndedTurn: function(data) {
@@ -361,6 +495,20 @@ jQuery(function($){
                 };
 
                 IO.socket.emit("hostPreparedTurn", newdata);
+            },
+            
+            playerDefended: function(data) {
+                App.playersDefended++;
+
+                if (data.action == "yield") {
+                    App.Host.currentTurnData.yield = data.playerID;
+                }
+                
+                if (App.playersDefended == App.Host.players.length - 1) {
+                    // All players have defended,reset counter to 0 and continue game
+                    App.playersDefended = 0;
+                    IO.socket.emit("hostCheckAllPlayersDefended", App.Host.players[App.currentPlayer]);
+                }
             }
         },
 
@@ -402,7 +550,16 @@ jQuery(function($){
                     vp: 0,
                     energy: 0,
                     maxhp: 20,
-                    isInTokyoCity: false
+                    isInTokyoCity: false,
+                    cards: [],
+                    hasCard: function(cardToFind) {
+                        $.each(this.cards, function(index, card) {
+                            if (card.title == cardToFind) {
+                                return true;
+                            }
+                        });
+                        return false;
+                    }
                 };
 
                 // Send the gameID and playerName to the server
@@ -418,25 +575,36 @@ jQuery(function($){
 
                 // Get dice data
                 data.diceresult = {
-                    1: $("#inputDice1"),
-                    2: $("#inputDice2"),
-                    3: $("#inputDice3"),
-                    Damage: $("#inputDiceDamage"),
-                    Heart: $("#inputDiceHeart"),
-                    Energy: $("#inputDiceEnergy")
+                    one: $("#inputDice1").val() || 0,
+                    two: $("#inputDice2").val() || 0,
+                    three: $("#inputDice3").val() || 0,
+                    damage: $("#inputDiceDamage").val() || 0,
+                    heart: $("#inputDiceHeart").val() || 0,
+                    energy: $("#inputDiceEnergy").val() || 0
                 };
 
-                // TODO: Empty fields
+                $(".inputDiceValue").val("");
 
                 IO.socket.emit('playerConfirmedDice', data);
             },
 
-            onAttackClick: function() {
-                IO.socket.emit('playerAttacked', App.Player.getPlayerData());
+            onEndturnClick: function() {
+                $(".playGameWrapper").addClass("hidden");
+                IO.socket.emit('playerEndTurn', App.Player.getPlayerData());
             },
 
-            onEndturnClick: function() {
-                IO.socket.emit('playerEndTurn', App.Player.getPlayerData());
+            onEndDefendingClick: function() {
+                $(".defendbutton").addClass("hidden");
+                var data = App.Player.getPlayerData();
+                data.action = 'endDefending';
+                IO.socket.emit('playerEndDefending', data);
+            },
+
+            onYieldClick: function() {
+                $(".defendbutton").addClass("hidden");
+                var data = App.Player.getPlayerData();
+                data.action = 'yield';
+                IO.socket.emit('playerEndDefending', data);
             },
 
             /**
@@ -473,9 +641,8 @@ jQuery(function($){
                 // Check if current turn is players turn
                 var playerData = App.Player.getPlayerData();
                 if (data.currentTurnID == playerData.playerID) {
-                    $(".playGameWrapper").addClass("current-turn");
-                } else {
-                    $(".playGameWrapper").removeClass("current-turn");
+                    $(".rollDiceWrapper").removeClass("hidden");
+                    $(".defendGameWrapper").addClass("hidden");
                 }
             },
 
@@ -485,6 +652,37 @@ jQuery(function($){
                     playerID : $('#playerID').html(),
                     playerName: $("#playerName").html()
                 };
+            },
+
+            playerRolledDice: function(data) {
+                // If current player is not the one that rolled
+                var player = App.Player.getPlayerData();
+                if (player.playerID != data.playerID) {
+                    var actions = 0;
+                    var defend = $(".defendGameWrapper");
+                    // If player can do actions, show the defending wrapper
+                    defend.removeClass("hidden");
+
+                    if (player.playerID == App.currentlyInTokyo) {
+                        actions++;
+                        $("#actionYield").removeClass("hidden");
+                    }
+
+                    // Else, just emit that we're done.
+                    if (actions == 0) {
+                        IO.socket.emit('playerEndDefending', App.Player.getPlayerData());
+                    }
+                }
+            },
+
+            allPlayersDefended: function(data) {
+                var player = App.Player.getPlayerData();
+                if (player.playerID == data.socketId) {
+                    $(".rollDiceWrapper").addClass("hidden");
+                    $(".playGameWrapper").removeClass("hidden");
+                } else {
+                    $(".defendGameWrapper").addClass("hidden");
+                }
             }
         }
     };

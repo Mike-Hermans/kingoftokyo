@@ -16,12 +16,14 @@ exports.initGame = function(sio, socket){
     gameSocket.on('hostCreateNewGame', hostCreateNewGame);
     gameSocket.on('hostRoomFull', hostPrepareGame);
     gameSocket.on('hostPreparedTurn', hostPreparedTurn);
+    gameSocket.on('hostCheckAllPlayersDefended', hostCheckAllPlayersDefended);
 
     // Player Events
     gameSocket.on('playerJoinGame', playerJoinGame);
-    gameSocket.on('playerAttacked', playerAttacked);
     gameSocket.on('playerEndTurn', playerEndTurn);
     gameSocket.on('playerConfirmedDice', playerConfirmedDice);
+    gameSocket.on('playerEndDefending', playerEndedDefending);
+    gameSocket.on('tokyoTakeOver', tokyoTakeOver);
 };
 
 /* *******************************
@@ -67,6 +69,10 @@ function hostPreparedTurn(data) {
     io.sockets.in(newdata.gameID).emit('playerStartTurn', newdata);
 }
 
+function hostCheckAllPlayersDefended(data) {
+    io.sockets.in(data.gameID).emit('allPlayersDefended', data);
+}
+
 /* *****************************
    *                           *
    *     PLAYER FUNCTIONS      *
@@ -108,15 +114,18 @@ function playerJoinGame(data) {
    *      GAME LOGIC       *
    *                       *
    ************************* */
-
-function playerAttacked(data) {
-    io.sockets.in(data.gameID).emit('hostCheckAttack', data);
-}
-
 function playerEndTurn(data) {
     io.sockets.in(data.gameID).emit('hostHandleEndTurn', data);
 }
 
 function playerConfirmedDice(data) {
     io.sockets.in(data.gameID).emit('playerRolledDice', data);
+}
+
+function playerEndedDefending(data) {
+    io.sockets.in(data.gameID).emit('playerEndedDefending', data);
+}
+
+function tokyoTakeOver(data) {
+    io.sockets.in(data.gameID).emit('playerTokyoTakeover', data);
 }
