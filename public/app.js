@@ -36,6 +36,7 @@ jQuery(function($){
             IO.socket.on('playerEndedDefending', IO.playerCheckDefendEnd);
             IO.socket.on('allPlayersDefended', IO.allPlayersDefended);
             IO.socket.on('playerTokyoTakeover', IO.checkTokyoTakeover);
+            IO.socket.on('playerBoughtCard', IO.hostCheckPlayerBoughtCard);
         },
 
         /**
@@ -107,6 +108,12 @@ jQuery(function($){
 
         checkTokyoTakeover: function(data) {
             App.currentlyInTokyo = data.socketId;
+        },
+
+        hostCheckPlayerBoughtCard: function(data) {
+            if (App.myRole == "Host") {
+                App.Host.playerBoughtCard(data);
+            }
         },
 
         /**
@@ -199,7 +206,14 @@ jQuery(function($){
             App.$doc.on('click', '#actionConfirmDiceRoll', App.Player.onConfirmDiceClick);
             App.$doc.on('click', '#actionEndDefending', App.Player.onEndDefendingClick);
 
+            // Defender actions
             App.$doc.on('click', '#actionYield', App.Player.onYieldClick);
+            App.$doc.on('click', '#actionPurchaseCard', App.Player.onPurchaseCardClick);
+
+            // Buying cards
+            App.$doc.on('click', '#buyCardAccept', App.Player.onBuyCardAcceptClick);
+            App.$doc.on('click', '#buyCardDeny', App.Player.onBuyCardDenyClick);
+
         },
 
         loadGameData: function() {
@@ -286,6 +300,47 @@ jQuery(function($){
                     .text(data.playerName + ' joined the game.');
 
                 // Store the new player's data on the Host.
+                data.hasCard = function(cardToFind) {
+                    var cardFound = false;
+                    $.each(this.cards, function(index, card) {
+                        // Trim the strings because fuck you apparently
+                        if ($.trim(card) == $.trim(cardToFind)) {
+                            cardFound = true;
+                        }
+                    });
+
+                    return cardFound;
+                };
+                data.takeDamage = function(damage) {
+                    if (this.hasCard("were only making it stronger")) {
+                        if (damage >= 2) {
+                            this.energy++;
+                        }
+                    }
+
+                    if (this.hasCard("armor plating") && damage == 1) {
+                        damage = 0;
+                    }
+
+                    this.hp -= damage;
+                };
+                data.heal = function(heal) {
+                    if (heal > 0) {
+                        heal++;
+                    }
+
+                    if (!this.isInTokyoCity) {
+                        for (var i = 0; i < heal; i++) {
+                            if (this.hasCard("regeneration")) {
+                                heal++;
+                            }
+                            if (this.hp < this.maxhp) {
+                                this.hp++;
+                            }
+                            //messages.push("heals " + heal + " hitpoints");
+                        }
+                    }
+                };
                 App.Host.players.push(data);
 
                 // Increment the number of players in the room
@@ -360,13 +415,23 @@ jQuery(function($){
                             messages.push("gains 2 victory points from Tokyo City");
                         }
 
+                        damage = parseInt(data.diceresult.damage);
+
                         // Victory points rolls
                         var victorypoints = 0;
                         if (data.diceresult.one >= 3) {
                             victorypoints += 1 + (data.diceresult.one - 3);
+
+                            if (player.hasCard("gourmet")) {
+                                victorypoints+=2;
+                            }
                         }
                         if (data.diceresult.two >= 3) {
                             victorypoints += 2 + (data.diceresult.two - 3);
+
+                            if (player.hasCard("poison quills") && damage > 0) {
+                                damage += 2;
+                            }
                         }
                         if (data.diceresult.three >= 3) {
                             victorypoints += 3 + (data.diceresult.three - 3);
@@ -388,17 +453,30 @@ jQuery(function($){
                         }
 
                         // Energy
-                        player.energy += parseInt(data.diceresult.energy);
-
-                        if (!player.isInTokyoCity) {
-                            for (var i = 0; i < data.diceresult.heart; i++) {
-                                if (player.hp < player.maxhp) {
-                                    player.hp++;
-                                }
+                        var energyCount = parseInt(data.diceresult.energy);
+                        if (player.hasCard("solar powered") && player.energy == 0 && energyCount == 0) {
+                            energyCount = 1;
+                        }
+                        if (energyCount > 0) {
+                            if (player.hasCard("friend of children")) {
+                                energyCount++;
                             }
+                            player.energy += energyCount;
+                            messages.push("generates " + energyCount + " energy");
                         }
 
-                        damage = parseInt(data.diceresult.damage);
+                        // Heal
+                        player.heal(data.diceresult.heart);
+
+                        // Damage
+                        if (player.hasCard("acid attack")) {
+                            damage++;
+                        }
+
+                        if (damage >= 1 && player.hasCard("spiked tail")) {
+                            damage++;
+                        }
+
                         attackingPlayerIsInTokyo = player.isInTokyoCity;
 
                         if ($("#tokyo-city").html() == "" && damage > 0) {
@@ -449,7 +527,7 @@ jQuery(function($){
                         // Deal damage to everyone
                         $.each(App.Host.players, function(index, player) {
                             if (player.socketId != turndata.playerID) {
-                                player.hp -= turndata.damage;
+                                player.takeDamage(turndata.damage);
                                 App.Host.updateGamefield(player.playerName + " takes " + turndata.damage + " damage");
                             }
                         });
@@ -458,7 +536,7 @@ jQuery(function($){
                         $.each(App.Host.players, function(index, player) {
                             if (player.socketId == App.currentlyInTokyo) {
                                 // This player gets attacked
-                                player.hp -= turndata.damage;
+                                player.takeDamage(turndata.damage);
                                 App.Host.updateGamefield(player.playerName + " takes " + turndata.damage + " damage");
                             }
                         });
@@ -509,6 +587,35 @@ jQuery(function($){
                     App.playersDefended = 0;
                     IO.socket.emit("hostCheckAllPlayersDefended", App.Host.players[App.currentPlayer]);
                 }
+            },
+
+            playerBoughtCard: function(data) {
+                $.each(App.Host.players, function(index, player) {
+                    if (player.socketId == data.playerID) {
+                        switch (data.card.title) {
+                            case "jet fighters":
+                                player.takeDamage(4);
+                                player.vp += 5;
+                                App.Host.updateGamefield(player.playerName + " activated Jet Fighters! He took 4 damage and received 5 Victory Points.");
+                                break;
+                            case "nuclear powerplant":
+                                player.heal(3);
+                                player.vp += 2;
+                                App.Host.updateGamefield(player.playerName + " activated Nuclear Powerplant. Received 2 Victory Points and healed for 3 points");
+                                break;
+                            case "tanks":
+                                player.takeDamage(3);
+                                player.vp += 4;
+                                App.Host.updateGamefield(player.playerName + " activated Tanks! Took 3 damage and received 4 Victory Points.");
+                                break;
+                            case "corner store":
+                                player.vp += 1;
+                                App.Host.updateGamefield(player.playerName + " attacked a corner store and received 1 Victory Point");
+                                break;
+                        }
+                        player.cards.push(data.card.title);
+                    }
+                });
             }
         },
 
@@ -544,22 +651,14 @@ jQuery(function($){
             onPlayerStartClick: function() {
                 // collect data to send to the server
                 var data = {
-                    gameID : +($('#inputgameID').val()),
-                    playerName : $('#inputPlayerName').val() || 'noob',
-                    hp: 20,
+                    gameID: +($('#inputgameID').val()),
+                    playerName: $('#inputPlayerName').val() || 'noob',
+                    hp: 10,
                     vp: 0,
                     energy: 0,
-                    maxhp: 20,
+                    maxhp: 10,
                     isInTokyoCity: false,
-                    cards: [],
-                    hasCard: function(cardToFind) {
-                        $.each(this.cards, function(index, card) {
-                            if (card.title == cardToFind) {
-                                return true;
-                            }
-                        });
-                        return false;
-                    }
+                    cards: []
                 };
 
                 // Send the gameID and playerName to the server
@@ -683,6 +782,99 @@ jQuery(function($){
                 } else {
                     $(".defendGameWrapper").addClass("hidden");
                 }
+            },
+
+            onPurchaseCardClick: function() {
+                $(".playGameWrapper").addClass("hidden");
+                $(".purchaseCardDiv, #actionScanCard").removeClass("hidden");
+
+                var finderResults = false;
+                var cloudRecognition = new craftar.CloudRecognition({
+                    token: 'f9b09592aaff45bc'
+                });
+                var scanButton = $("#actionScanCard");
+
+                cloudRecognition.addListener('results', function(err, response, xhr){
+                    if (response.results && response.results.length > 0) {
+                        finderResults = true;
+                        cloudRecognition.stopFinder();
+
+                        var card = response.results[0].item.name.split("|");
+
+                        // Remove camera field
+                        $("#videoCapture").html("");
+                        $("#actionScanCard").addClass("hidden");
+                        
+                        // Show option to buy card
+                        $("#cardname").html(card[0].replace(/_/g, " "));
+                        $("#energy").html(card[1]);
+                        $("#cardPopup").removeClass("hidden");
+                    }
+                });
+
+                cloudRecognition.addListener('finderFinished', function(){
+                    if (!finderResults) {
+                        //alert("No results found, point to an object.");
+                        cloudRecognition.stopFinder();
+
+                        var card = ["acid_attack", 6];
+
+                        // Remove camera field
+                        $("#videoCapture").html("");
+                        $("#actionScanCard").addClass("hidden");
+
+                        // Show option to buy card
+                        $("#cardname").html(card[0].replace(/_/g, " "));
+                        $("#energy").html(card[1]);
+                        $("#cardPopup").removeClass("hidden");
+                    }
+                });
+
+                if ( craftar.supportsCapture() ) {
+                    setupCapture(function(err, captureObject) {
+                        if (err) {
+                            alert("Something went wrong");
+                        } else {
+                            var capelem = $("#videoCapture");
+                            capelem.append(captureObject.domElement);
+
+                            scanButton.on('click', function() {
+                                finderResults = false;
+                                cloudRecognition.startFinder(captureObject, 2000, 3);
+                            });
+                        }
+                    })
+                }
+
+                function setupCapture( callback ) {
+                    var capture = new craftar.Capture();
+
+                    capture.addListener('started', function() {
+                        callback(null, capture);
+                    });
+
+                    capture.addListener('error', function(error) {
+                        callback(error, capture);
+                    });
+
+                    capture.start();
+                }
+            },
+
+            onBuyCardDenyClick: function() {
+                $("#cardPopup, .purchaseCardDiv").addClass("hidden");
+                $(".playGameWrapper").removeClass("hidden");
+            },
+
+            onBuyCardAcceptClick: function() {
+                var data = App.Player.getPlayerData();
+                data.card = {
+                    title: $("#cardname").html(),
+                    cost: $("#energy").html()
+                };
+                IO.socket.emit("playerBuysCard", data);
+                $("#cardPopup, .purchaseCardDiv").addClass("hidden");
+                $(".playGameWrapper").removeClass("hidden");
             }
         }
     };

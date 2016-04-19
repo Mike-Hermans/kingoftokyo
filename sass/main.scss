@@ -4,11 +4,6 @@ body {
 	
 }
 
-.fullwidth {
-  width: 100%;
-  margin-top: 20px;
-}
-
 .gameID {
   text-align: center;
   font-size: 72px;
@@ -22,4 +17,20 @@ body {
 
 .hidden {
   display: none;
+}
+
+.btn {
+  width: 100%;
+  margin-top: 20px;
+}
+
+#videoCapture {
+  video {
+    width: 100%;
+    height: 50%;
+  }
+}
+
+#cardname {
+  text-transform: capitalize;
 }

@@ -24,6 +24,7 @@ exports.initGame = function(sio, socket){
     gameSocket.on('playerConfirmedDice', playerConfirmedDice);
     gameSocket.on('playerEndDefending', playerEndedDefending);
     gameSocket.on('tokyoTakeOver', tokyoTakeOver);
+    gameSocket.on('playerBuysCard', playerBuysCard);
 };
 
 /* *******************************
@@ -101,6 +102,7 @@ function playerJoinGame(data) {
         sock.join(data.gameID);
 
         // Emit an event notifying the clients that the player has joined the room.
+        console.log(data);
         io.sockets.in(data.gameID).emit('playerJoinedRoom', data);
 
     } else {
@@ -128,4 +130,8 @@ function playerEndedDefending(data) {
 
 function tokyoTakeOver(data) {
     io.sockets.in(data.gameID).emit('playerTokyoTakeover', data);
+}
+
+function playerBuysCard(data) {
+    io.sockets.in(data.gameID).emit('playerBoughtCard', data);
 }

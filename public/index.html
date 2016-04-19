@@ -28,9 +28,8 @@
             <h1>King of Tokyo</h1>
 
             <div class="col s12">
-                <button id="btnCreateGame" class="btn fullwidth left hide-on-small-only">CREATE</button>
-                <button id="btnJoinGame" class="btn fullwidth right">JOIN</button>
-                <div style="clear:both"></div>
+                <button id="btnCreateGame" class="btn hide-on-small-only">CREATE</button>
+                <button id="btnJoinGame" class="btn">JOIN</button>
             </div>
         </div>
     </script>
@@ -104,18 +103,28 @@
             </div>
         </div>
         <div class="playGameWrapper hidden">
-            <button class="btn actionbtn fullwidth activeturn" id="actionEndTurn">END TURN</button>
+            <button class="btn" id="actionPurchaseCard">PURCHASE CARD</button>
+            <button class="btn" id="actionEndTurn">END TURN</button>
+        </div>
+        <div class="purchaseCardDiv hidden">
+            <div id="videoCapture"></div>
+            <div id="cardPopup" class="hidden">
+                <p>Buy <span id="cardname"></span> for <span id="energy"></span> energy?</p>
+                <button class="btn" id="buyCardAccept">YES</button>
+                <button class="btn" id="buyCardDeny">NO</button>
+            </div>
+            <button class="btn" id="actionScanCard">SCAN</button>
         </div>
         <div class="defendGameWrapper hidden">
-            <button class="btn actionbtn fullwidth hidden defendbutton" id="actionYield">YIELD</button>
-            <button class="btn actionbtn fullwidth" id="actionEndDefending">ACCEPT</button>
+            <button class="btn hidden defendbutton" id="actionYield">YIELD</button>
+            <button class="btn" id="actionEndDefending">ACCEPT</button>
         </div>
     </script>
 
     <!-- This is the 'Host' screen. It displays the word for each player to match -->
     <script id="host-game-template" type="text/template">
         <div class="row">
-            <p>Currently in Tokyo City: <span data-id="" id="tokyo-city"></span></p>
+            <p>Currently in Tokyo City: <span id="tokyo-city"></span></p>
         </div>
         <div class="row">
             <div class="col s12 m6">
@@ -155,6 +164,9 @@
 
     <!-- Compiled and minified JavaScript -->
     <script src="libs/materialize.min.js"></script>
+
+    <!-- CraftAR SDK -->
+    <script src="libs/craftar.min.js"></script>
 
     <!-- If Socket.IO is used with Express, then the /socket.io/ path will
         serve the proper Socket.IO javascript files used by the browser -->
