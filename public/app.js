@@ -362,6 +362,11 @@ jQuery(function($){
                 IO.socket.emit("hostPreparedTurn", data);
             },
 
+            /**
+             * Display the updated data for each player and add a
+             * new message if required
+             * @param updateMessage
+             */
             updateGamefield: function(updateMessage) {
                 // Display the players' names data on screen
 
@@ -400,6 +405,10 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Handle a player's diceroll
+             * @param data
+             */
             playerRolledDice: function(data) {
                 // Manage data for the player that rolled
                 var messages = [];
@@ -519,6 +528,10 @@ jQuery(function($){
                 App.Host.updateGamefield(completeMessage);
             },
 
+            /**
+             * Send a signal back to the current player
+             * @param data
+             */
             allPlayersDefended: function(data) {
                 var turndata = App.Host.currentTurnData;
 
@@ -559,6 +572,10 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Register how many players ended their turn
+             * @param data
+             */
             playerEndedTurn: function(data) {
                 if (App.currentPlayer == App.Host.players.length - 1) {
                     App.currentPlayer = 0;
@@ -574,7 +591,11 @@ jQuery(function($){
 
                 IO.socket.emit("hostPreparedTurn", newdata);
             },
-            
+
+            /**
+             * Handle the defending player's action
+             * @param data
+             */
             playerDefended: function(data) {
                 App.playersDefended++;
 
@@ -589,6 +610,10 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Handle card data
+             * @param data
+             */
             playerBoughtCard: function(data) {
                 var cardPlayed = false;
 
@@ -736,7 +761,10 @@ jQuery(function($){
                 App.myRole = 'Player';
                 App.Player.myName = data.playerName;
             },
-            
+
+            /**
+             * Confirm the diceroll
+             */
             onConfirmDiceClick: function() {
                 var data = App.Player.getPlayerData();
 
@@ -755,11 +783,17 @@ jQuery(function($){
                 IO.socket.emit('playerConfirmedDice', data);
             },
 
+            /**
+             * End the current player's turn
+             */
             onEndturnClick: function() {
                 $(".playGameWrapper").addClass("hidden");
                 IO.socket.emit('playerEndTurn', App.Player.getPlayerData());
             },
 
+            /**
+             * End the defensive phase for a player
+             */
             onEndDefendingClick: function() {
                 $(".defendbutton").addClass("hidden");
                 var data = App.Player.getPlayerData();
@@ -767,6 +801,9 @@ jQuery(function($){
                 IO.socket.emit('playerEndDefending', data);
             },
 
+            /**
+             * Yield from Tokyo
+             */
             onYieldClick: function() {
                 $(".defendbutton").addClass("hidden");
                 var data = App.Player.getPlayerData();
@@ -804,6 +841,10 @@ jQuery(function($){
                 $('#playerName').html(App.Player.myName);
             },
 
+            /**
+             * Display the required fields
+             * @param data
+             */
             startTurn: function(data) {
                 // Check if current turn is players turn
                 var playerData = App.Player.getPlayerData();
@@ -813,6 +854,10 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Retrieve basic playerdata
+             * @returns {{gameID: int, playerID: int, playerName: string}}
+             */
             getPlayerData: function() {
                 return {
                     gameID : $('#gameID').html(),
@@ -821,6 +866,11 @@ jQuery(function($){
                 };
             },
 
+            /**
+             * Handle for each player what needs to be shown when a dice
+             * roll has occured
+             * @param data
+             */
             playerRolledDice: function(data) {
                 // If current player is not the one that rolled
                 var player = App.Player.getPlayerData();
@@ -842,6 +892,11 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Make sure the current player can continue after everyone
+             * was able to defend
+             * @param data
+             */
             allPlayersDefended: function(data) {
                 var player = App.Player.getPlayerData();
                 if (player.playerID == data.socketId) {
@@ -852,6 +907,9 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Start the scan event to buy a card
+             */
             onPurchaseCardClick: function() {
                 $(".playGameWrapper").addClass("hidden");
                 $(".purchaseCardDiv, #actionScanCard").removeClass("hidden");
@@ -929,11 +987,17 @@ jQuery(function($){
                 }
             },
 
+            /**
+             * Cancel and return to main screen
+             */
             onBuyCardDenyClick: function() {
                 $("#cardPopup, .purchaseCardDiv").addClass("hidden");
                 $(".playGameWrapper").removeClass("hidden");
             },
 
+            /**
+             * Try to buy a card
+             */
             onBuyCardAcceptClick: function() {
                 var data = App.Player.getPlayerData();
                 data.card = {
