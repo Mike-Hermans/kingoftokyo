@@ -34,3 +34,12 @@ body {
 #cardname {
   text-transform: capitalize;
 }
+
+.player_cards {
+  .collection-header {
+    font-weight: bold;
+  }
+  li {
+    text-transform: capitalize;
+  }
+}

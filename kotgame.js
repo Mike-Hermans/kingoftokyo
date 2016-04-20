@@ -102,7 +102,6 @@ function playerJoinGame(data) {
         sock.join(data.gameID);
 
         // Emit an event notifying the clients that the player has joined the room.
-        console.log(data);
         io.sockets.in(data.gameID).emit('playerJoinedRoom', data);
 
     } else {

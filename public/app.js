@@ -47,9 +47,6 @@ jQuery(function($){
             App.socketId = IO.socket.socket.sessionid;
         },
 
-        // gameData object
-        gameData: {},
-
         /**
          * A new game has been created and a random game ID has been generated.
          * @param data {{ gameID: int, socketId: * }}
@@ -173,7 +170,6 @@ jQuery(function($){
             App.cacheElements();
             App.showInitScreen();
             App.bindEvents();
-            App.loadGameData();
         },
 
         /**
@@ -214,12 +210,6 @@ jQuery(function($){
             App.$doc.on('click', '#buyCardAccept', App.Player.onBuyCardAcceptClick);
             App.$doc.on('click', '#buyCardDeny', App.Player.onBuyCardDenyClick);
 
-        },
-
-        loadGameData: function() {
-            $.getJSON('data/gamedata.json', function(data) {
-                App.gameData = data;
-            });
         },
 
         /* *************************************
@@ -311,7 +301,7 @@ jQuery(function($){
 
                     return cardFound;
                 };
-                data.takeDamage = function(damage) {
+                data.calculateDamage = function(damage) {
                     if (this.hasCard("were only making it stronger")) {
                         if (damage >= 2) {
                             this.energy++;
@@ -322,7 +312,10 @@ jQuery(function($){
                         damage = 0;
                     }
 
-                    this.hp -= damage;
+                    return damage;
+                };
+                data.takeDamage = function(damage) {
+                    this.hp -= calculateDamage(damage);
                 };
                 data.heal = function(heal) {
                     if (heal > 0) {
@@ -337,7 +330,6 @@ jQuery(function($){
                             if (this.hp < this.maxhp) {
                                 this.hp++;
                             }
-                            //messages.push("heals " + heal + " hitpoints");
                         }
                     }
                 };
@@ -383,10 +375,18 @@ jQuery(function($){
                 ];
 
                 $.each(App.Host.players, function (playerIndex, player) {
+                    var playerData = $("#player_" + playerIndex);
                     $.each(data, function(dataIndex, data) {
-                        $('#player_' + playerIndex)
+                        playerData
                             .find(data[0])
                             .html(App.Host.players[playerIndex][data[1]]);
+                    });
+
+                    var cardsCollection = playerData.find(".player_cards");
+                    cardsCollection.html('<li class="collection-header">Powerups</li>');
+
+                    $.each(player.cards, function(index, card) {
+                        cardsCollection.append('<li class="collection-item">' + card + '</li>');
                     });
 
                     if (playerIndex == App.currentPlayer) {
@@ -590,6 +590,9 @@ jQuery(function($){
             },
 
             playerBoughtCard: function(data) {
+                var cardPlayed = false;
+
+                // Check cards that benefit the executing player
                 $.each(App.Host.players, function(index, player) {
                     if (player.socketId == data.playerID) {
                         switch (data.card.title) {
@@ -597,25 +600,90 @@ jQuery(function($){
                                 player.takeDamage(4);
                                 player.vp += 5;
                                 App.Host.updateGamefield(player.playerName + " activated Jet Fighters! He took 4 damage and received 5 Victory Points.");
+                                cardPlayed = true;
                                 break;
                             case "nuclear powerplant":
                                 player.heal(3);
                                 player.vp += 2;
                                 App.Host.updateGamefield(player.playerName + " activated Nuclear Powerplant. Received 2 Victory Points and healed for 3 points");
+                                cardPlayed = true;
                                 break;
                             case "tanks":
                                 player.takeDamage(3);
                                 player.vp += 4;
                                 App.Host.updateGamefield(player.playerName + " activated Tanks! Took 3 damage and received 4 Victory Points.");
+                                cardPlayed = true;
                                 break;
                             case "corner store":
                                 player.vp += 1;
                                 App.Host.updateGamefield(player.playerName + " attacked a corner store and received 1 Victory Point");
+                                cardPlayed = true;
                                 break;
                         }
-                        player.cards.push(data.card.title);
                     }
                 });
+
+                // Cards that affect multiple players
+                if (!cardPlayed) {
+                    switch (data.card.title) {
+                        case "fire blast":
+                            $.each(App.Host.players, function(index, player) {
+                                if (player.socketId != data.playerID) {
+                                    player.takeDamage(2);
+                                }
+                            });
+                            break;
+                        case "high altitude bombing":
+                            $.each(App.Host.players, function(index, player) {
+                                player.takeDamage(3);
+                            });
+                            break;
+                        case "gas refinery":
+                            $.each(App.Host.players, function(index, player) {
+                                if (player.socketId == data.playerID) {
+                                    player.vp += 2;
+                                } else {
+                                    player.takeDamage(3);
+                                }
+                            });
+                            break;
+                        case "death from above":
+                            $.each(App.Host.players, function(index, player) {
+                                if (player.socketId == data.playerID) {
+                                    player.vp += 2;
+
+                                    if (!player.isInTokyoCity) {
+                                        player.isInTokyoCity = true;
+
+                                        $.each(App.Host.players, function(playerIndex, otherplayer) {
+                                            if (otherplayer.isInTokyoCity) {
+                                                otherplayer.isInTokyoCity = false;
+                                                App.currentlyInTokyo = player.socketId;
+                                                App.Host.updateGamefield(player.playerName + " takes over!");
+                                                player.vp++;
+                                                $("#tokyo-city").html(player.playerName);
+                                            }
+                                        })
+                                    }
+                                }
+                            });
+                            break;
+                    }
+                }
+
+                // Card must be a Keep card
+                if (!cardPlayed) {
+                    $.each(App.Host.players, function(index, player) {
+                        if (player.socketId == data.playerID) {
+                            if (data.card.title == "even bigger") {
+                                player.maxhp += 2;
+                                player.hp += 2;
+                            }
+                            player.cards.push(data.card.title);
+                            App.Host.updateGamefield(player.playerName + " purchased " + data.card.title);
+                        }
+                    });
+                }
             }
         },
 
