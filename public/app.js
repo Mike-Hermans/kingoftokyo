@@ -48,31 +48,18 @@ jQuery(function($){
         },
 
         /**
-         * A new game has been created and a random game ID has been generated.
-         * @param data {{ gameID: int, socketId: * }}
+         * Run the required functions in either the App.Host or App.Player
+         * object, or both.
+         * @param data
          */
         onNewGameCreated : function(data) {
             App.Host.gameInit(data);
         },
 
-        /**
-         * A player has successfully joined the game.
-         * @param data {{playerName: string, gameID: int, socketId: int}}
-         */
         playerJoinedRoom : function(data) {
-            // When a player joins a room, do the updateWaitingScreen funciton.
-            // There are two versions of this function: one for the 'host' and
-            // another for the 'player'.
-            //
-            // So on the 'host' browser window, the App.Host.updateWiatingScreen function is called.
-            // And on the player's browser, App.Player.updateWaitingScreen is called.
             App[App.myRole].updateWaitingScreen(data);
         },
 
-        /**
-         * Both players have joined the game.
-         * @param data
-         */
         beginNewGame : function(data) {
             App[App.myRole].gameSetup(data);
         },
@@ -112,6 +99,7 @@ jQuery(function($){
                 App.Host.playerBoughtCard(data);
             }
         },
+        // ------ End function checks ------ //
 
         /**
          * An error has occurred.
@@ -315,7 +303,11 @@ jQuery(function($){
                     return damage;
                 };
                 data.takeDamage = function(damage) {
-                    this.hp -= calculateDamage(damage);
+                    this.hp -= this.calculateDamage(damage);
+
+                    if (this.hp <= 0) {
+                        App.Host.updateGamefield(this.playerName + " died!");
+                    }
                 };
                 data.heal = function(heal) {
                     if (heal > 0) {
@@ -576,12 +568,19 @@ jQuery(function($){
              * Register how many players ended their turn
              * @param data
              */
-            playerEndedTurn: function(data) {
-                if (App.currentPlayer == App.Host.players.length - 1) {
-                    App.currentPlayer = 0;
-                } else {
-                    App.currentPlayer++;
+            playerEndedTurn: function(data)  {
+                var turnReady = false;
+                while (!turnReady) {
+                    if (App.currentPlayer == App.Host.players.length - 1) {
+                        App.currentPlayer = 0;
+                    } else {
+                        App.currentPlayer++;
+                    }
+                    if (App.Host.players[App.currentPlayer].hp > 0) {
+                        turnReady = true;
+                    }
                 }
+
                 App.Host.updateGamefield(data.playerName + " ended the turn");
 
                 var newdata = {
@@ -851,6 +850,14 @@ jQuery(function($){
                 if (data.currentTurnID == playerData.playerID) {
                     $(".rollDiceWrapper").removeClass("hidden");
                     $(".defendGameWrapper").addClass("hidden");
+
+                    $(".dice").on("click", function() {
+                        if ($(this).hasClass("locked")) {
+                            $(this).removeClass("locked");
+                        } else {
+                            $(this).addClass("locked");
+                        }
+                    });
                 }
             },
 

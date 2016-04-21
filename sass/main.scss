@@ -43,3 +43,25 @@ body {
     text-transform: capitalize;
   }
 }
+
+.diceContainer {
+  display: block;
+  width: 100%;
+
+  .dice {
+    display: block;
+    float: left;
+    width: 49%;
+    height: 30px;
+    border: 1px solid black;
+    margin: 0.5% 1% 0.5% 0;
+
+    &:nth-child(even) {
+      margin: 0.5% 0 0.5% 1%;
+    }
+
+    &.locked {
+      border-color: red;
+    }
+  }
+}
