@@ -474,8 +474,19 @@ jQuery(function($){
                             damage++;
                         }
 
-                        if (damage >= 1 && player.hasCard("spiked tail")) {
-                            damage++;
+                        if (damage >= 1) {
+                            if (player.hasCard("spiked tail")) {
+                                damage++;
+                            }
+
+                            if (player.isInTokyoCity) {
+                                messages.push("deals " + damage + " damage to all players");
+                            } else if ($("#tokyo-city").html() == "") {
+                                messages.push(player.playerName + " takes control over Tokyo City");
+                            } else {
+                                messages.push("will deal " + damage + " damage to Tokyo City");
+                            }
+
                         }
 
                         attackingPlayerIsInTokyo = player.isInTokyoCity;
@@ -768,16 +779,34 @@ jQuery(function($){
                 var data = App.Player.getPlayerData();
 
                 // Get dice data
-                data.diceresult = {
-                    one: $("#inputDice1").val() || 0,
-                    two: $("#inputDice2").val() || 0,
-                    three: $("#inputDice3").val() || 0,
-                    damage: $("#inputDiceDamage").val() || 0,
-                    heart: $("#inputDiceHeart").val() || 0,
-                    energy: $("#inputDiceEnergy").val() || 0
-                };
+                data.diceresult = {one:0,two:0,three:0,damage:0,heart:0,energy:0};
 
-                $(".inputDiceValue").val("");
+                $.each($(".diceContainer").find(".dice"), function(index, dice) {
+                    switch ($(dice).html()) {
+                        case "1":
+                            data.diceresult.one++;
+                            break;
+                        case "2":
+                            data.diceresult.two++;
+                            break;
+                        case "3":
+                            data.diceresult.three++;
+                            break;
+                        case "damage":
+                            data.diceresult.damage++;
+                            break;
+                        case "heart":
+                            data.diceresult.heart++;
+                            break;
+                        case "energy":
+                            data.diceresult.energy++;
+                    }
+                });
+
+                console.log(data.diceresult);
+
+                $(".diceContainer").html("");
+                $(".rollDiceWrapper").addClass("hidden");
 
                 IO.socket.emit('playerConfirmedDice', data);
             },
@@ -849,7 +878,16 @@ jQuery(function($){
                 var playerData = App.Player.getPlayerData();
                 if (data.currentTurnID == playerData.playerID) {
                     $(".rollDiceWrapper").removeClass("hidden");
+                    $("#actionReroll").removeClass("hidden");
                     $(".defendGameWrapper").addClass("hidden");
+
+                    var rolls = 1;
+                    var diceResult = rollDice();
+
+                    $.each(diceResult, function(index, result) {
+                        $(".diceContainer")
+                            .append('<div class="dice" id="' + index + '">' + result + '</div>');
+                    });
 
                     $(".dice").on("click", function() {
                         if ($(this).hasClass("locked")) {
@@ -858,6 +896,50 @@ jQuery(function($){
                             $(this).addClass("locked");
                         }
                     });
+
+                    $("#actionReroll").on("click", function() {
+                        diceResult = rollDice();
+
+                        $.each($(".diceContainer").find(".dice"), function(index, dice) {
+                            if (!$(dice).hasClass("locked")) {
+                                $(dice).html(diceResult[index]);
+                            }
+                        });
+
+                        rolls++;
+
+                        if (rolls == 3) {
+                            $(this).off().addClass("hidden");
+                            $(".dice").off().removeClass("locked");
+                        }
+                    });
+                }
+
+                function rollDice() {
+                    var result = [
+                        Math.floor((Math.random() * 6) + 1),
+                        Math.floor((Math.random() * 6) + 1),
+                        Math.floor((Math.random() * 6) + 1),
+                        Math.floor((Math.random() * 6) + 1),
+                        Math.floor((Math.random() * 6) + 1),
+                        Math.floor((Math.random() * 6) + 1)
+                    ];
+
+                    for (var i = 0; i < result.length; i++) {
+                        switch (result[i]) {
+                            case 4:
+                                result[i] = "damage";
+                                break;
+                            case 5:
+                                result[i] = "heart";
+                                break;
+                            case 6:
+                                result[i] = "energy";
+                                break;
+                        }
+                    }
+
+                    return result;
                 }
             },
 
@@ -950,23 +1032,22 @@ jQuery(function($){
                         //alert("No results found, point to an object.");
                         cloudRecognition.stopFinder();
 
-                        var card = ["acid_attack", 6];
-
                         // Remove camera field
                         $("#videoCapture").html("");
                         $("#actionScanCard").addClass("hidden");
-
-                        // Show option to buy card
-                        $("#cardname").html(card[0].replace(/_/g, " "));
-                        $("#energy").html(card[1]);
-                        $("#cardPopup").removeClass("hidden");
+                        $(".playGameWrapper").removeClass("hidden");
                     }
                 });
 
                 if ( craftar.supportsCapture() ) {
                     setupCapture(function(err, captureObject) {
                         if (err) {
-                            alert("Something went wrong");
+                            alert("Seems like we can't access your camera.");
+
+                            // Remove camera field
+                            $("#videoCapture").html("");
+                            $("#actionScanCard").addClass("hidden");
+                            $(".playGameWrapper").removeClass("hidden");
                         } else {
                             var capelem = $("#videoCapture");
                             capelem.append(captureObject.domElement);
