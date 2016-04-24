@@ -886,7 +886,7 @@ jQuery(function($){
 
                     $.each(diceResult, function(index, result) {
                         $(".diceContainer")
-                            .append('<div class="dice" id="' + index + '">' + result + '</div>');
+                            .append('<div class="dice card-panel flow-text" id="' + index + '">' + result + '</div>');
                     });
 
                     $(".dice").on("click", function() {

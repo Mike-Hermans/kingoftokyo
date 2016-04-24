@@ -6243,12 +6243,12 @@ button.picker__today:focus, button.picker__clear:focus, button.picker__close:foc
     float: left;
     width: 49%;
     height: 65px;
-    border: 1px solid black;
     margin: 0.5% 1% 0.5% 0;
-    border-radius: 2px;
     line-height: 65px;
     text-align: center; }
     .diceContainer .dice:nth-child(even) {
       margin: 0.5% 0 0.5% 1%; }
     .diceContainer .dice.locked {
-      border-color: red; }
+      -webkit-box-shadow: 0 0 10px 2px #ffcc00;
+      -moz-box-shadow: 0 0 10px 2px #ffcc00;
+      box-shadow: 0 0 10px 2px #ffcc00; }
